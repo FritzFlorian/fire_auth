@@ -2,9 +2,8 @@ defmodule FireAuth.TokenValidation do
   @moduledoc """
   Validation of firebase id_tokens.
   """
-  require FireAuth.RecordHelper
-
-  alias FireAuth.RecordHelper
+  require FireAuth.Util
+  alias FireAuth.Util
 
   @doc """
   Validates a give token_string.
@@ -47,8 +46,8 @@ defmodule FireAuth.TokenValidation do
     check_token_claims_iss(claims)
   end
 
-  defp check_token_claims_exp(claims), do: Joken.current_time() <= claims["exp"]
-  defp check_token_claims_iat(claims), do: Joken.current_time() >= claims["iat"]
+  defp check_token_claims_exp(claims), do: Util.current_time() <= claims["exp"]
+  defp check_token_claims_iat(claims), do: Util.current_time() >= claims["iat"]
   defp check_token_claims_aud(claims), do: project_id() == claims["aud"]
   defp check_token_claims_iss(claims), do: "https://securetoken.google.com/#{project_id()}" == claims["iss"]
 
@@ -66,9 +65,9 @@ defmodule FireAuth.TokenValidation do
         jwk =
           cert
           |> decode_cert() # decode the cert read from googles json
-          |> RecordHelper.otp_certificate(:tbsCertificate) # use records to get the part we need
-          |> RecordHelper.otptbs_certificate(:subjectPublicKeyInfo)
-          |> RecordHelper.otp_subject_public_key_info(:subjectPublicKey)
+          |> Util.otp_certificate(:tbsCertificate) # use records to get the part we need
+          |> Util.otptbs_certificate(:subjectPublicKeyInfo)
+          |> Util.otp_subject_public_key_info(:subjectPublicKey)
           |> JOSE.JWK.from_key() # create our JWK token form it
 
         # Validate the token
