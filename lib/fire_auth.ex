@@ -3,57 +3,91 @@ defmodule FireAuth do
   Used to authenticate users with firebase id tokens.
   Usage:
 
-  plug FireAuth, [fetch_or_create_user: fn, fetch_access_list: fn]
+  plug FireAuth, [load_user: function, load_groups: function]
   ...
-  plug FireAuth.auth, group: "required_group"
+  plug FireAuth.Secure, group: "required_group"
   """
   import Plug.Conn
   require Logger
 
   def init(opts) do
-    opts
+    load_user = 
+      case Keyword.fetch(opts, :load_user) do
+        {:ok, load_user} ->
+          load_user
+        _ ->
+          fn _ -> nil end
+      end
+
+    load_groups =
+      case Keyword.fetch(opts, :load_groups) do
+        {:ok, load_user} ->
+          load_user
+        _ ->
+          fn _, _ -> [] end
+      end
+
+    %{load_user: load_user, load_groups: load_groups}
   end
 
-  def load_user(conn, opts) do
-    fetch_or_create_user = Keyword.fetch!(opts, :fetch_or_create_user)
-    fetch_access_list = Keyword.fetch!(opts, :fetch_access_list)
-    auth = conn.assigns[:auth]
+  # For mocking in tests set the :fire_auth_user, :fire_auth_groups, :fire_auth_token_info assigns.
+  # :fire_auth_user is required to trigger the mocking
+  def call(%{assigns: %{fire_auth_user: user}} = conn, 
+         %{load_user: load_user, load_groups: load_groups}) do
+    info = Map.get(conn.assigns, :fire_auth_token_info)
+    user = user || load_user.(info)
+       
+    fire_auth = %{
+      authenticated: true,
+      token_info: info,
+      user: user,
+      groups: Map.get(conn.assigns, :fire_auth_groups) || load_groups.(info, user)
+    }
 
-    user = fetch_or_create_user.(auth)
-    access_list = fetch_access_list.(user)
-        
-    conn
-    |> assign(:user, user)
-    |> assign(:groups, access_list)
+    assign(conn, :fire_auth, fire_auth)
   end
 
-  # Very messy, but fine to test authentication for now
-  def call(%{assigns: %{user: user}} = conn, _opts) do
-    conn
-    |> assign(:authenticated, true)
-    |> assign(:groups, user.groups)
-  end
-
-  def call(conn, opts) do
-    auth_header = conn
+  def call(conn, %{load_user: load_user, load_groups: load_groups}) do
+    auth_token = conn
                     |> Plug.Conn.get_req_header("authorization")
+                    |> Enum.map(&String.split/1)
+                    |> Enum.filter(fn e -> length(e) == 2 end)
+                    |> Enum.filter(fn [type, _] -> String.downcase(type) == "bearer" end)
+                    |> Enum.map(fn [_, token] -> token end)
                     |> Enum.at(0)
-    if auth_header do
-      [_, id_token] = String.split(auth_header)
-      case validate_token(id_token) do
+
+    if auth_token do
+      case validate_token(auth_token) do
         {:ok, info} -> 
-          conn
-          |> assign(:authenticated, true)
-          |> assign(:auth, info)
-          |> load_user(opts)
-        _ -> conn
+          user = load_user.(info)
+
+          fire_auth = %{
+            authenticated: true,
+            token_info: info,
+            user: user,
+            groups: load_groups.(info, user)
+          }
+
+          assign(conn, :fire_auth, fire_auth)
+        _ -> 
+          fire_auth = %{
+            authenticated: false,
+            token_info: nil,
+            user: nil,
+            groups: nil
+          }
+
+          assign(conn, :fire_auth, fire_auth)
       end
     else
-      conn
-      |> assign(:authenticated, false)
-      |> assign(:auth, nil)
-      |> assign(:user, nil)
-      |> assign(:groups, [])
+      fire_auth = %{
+        authenticated: false,
+        token_info: nil,
+        user: nil,
+        groups: nil
+      }
+
+      assign(conn, :fire_auth, fire_auth)
     end
   end
 
