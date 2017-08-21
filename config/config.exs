@@ -8,6 +8,6 @@ config :fire_auth,
 if Mix.env() == :test do
   config :fire_auth,
     project_id: "nada-preview",
-    current_time: 1503345599, # Time the test data was generated
+    current_time: 1503350512, # Time the test data was generated
     http_client: FireAuth.HttpClientMock # Mock the http client
 end

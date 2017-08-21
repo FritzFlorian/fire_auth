@@ -24,7 +24,6 @@ defmodule FireAuth.TokenValidation do
 
     with {:ok, claims} <- verify_token(token, header) do
       if check_token_claims(claims) do
-        IO.inspect(claims)
         {:ok, %{
           name: claims["name"],
           id: claims["sub"],
