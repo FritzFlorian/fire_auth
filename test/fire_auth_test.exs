@@ -82,6 +82,7 @@ defmodule FireAuthTest do
     assert "8nin8EPAQ3TMgHxHXJetMtGcHle2" == conn.assigns.fire_auth.user.id
   end
 
+  @tag :capture_log
   test "refuses invalid token" do
     conn = conn(:get, "/some_route")
             |> put_req_header("authorization", "Bearer #{@invalid_token}")

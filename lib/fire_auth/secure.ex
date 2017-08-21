@@ -16,7 +16,7 @@ defmodule FireAuth.Secure do
   import Plug.Conn
 
   def init(opts) do
-    case Keywod.fetch(opts, :group) do
+    case Keyword.fetch(opts, :group) do
       {:ok, group} ->
         %{group: group}
       _ ->
@@ -26,7 +26,7 @@ defmodule FireAuth.Secure do
 
   def call(%{assigns: %{fire_auth: %{authenticated: true} = fire_auth}} = conn, opts) do
     case opts do
-      %{grop: group} ->
+      %{group: group} ->
         if Enum.member?(fire_auth.groups , group) do
           conn
         else
